@@ -20,7 +20,7 @@ if sys.platform == 'win32':
     sys.stdout.reconfigure(encoding='utf-8')
 
 from src.database.db_manager import DBManager
-from src.ml.features_v2 import create_advanced_features
+from src.features.feature_store import FeatureStore
 
 def objective(trial, X_train, y_train, X_val, y_val):
     """
@@ -96,9 +96,10 @@ def train_neural_model(args=None):
     print(f"📊 Loaded {len(df_history)} historical matches.")
     
     # 2. Feature Engineering (Deep Features)
-    print("⚙️ Generating Deep Features (using features_v2)...")
+    print("⚙️ Generating Deep Features (via FeatureStore)...")
     try:
-        X, y, timestamps, _ = create_advanced_features(df_history)
+        feature_store = FeatureStore(None)
+        X, y, timestamps = feature_store.get_training_features(df_history)
     except Exception as e:
         print(f"⚠️ Error generating features: {e}")
         return

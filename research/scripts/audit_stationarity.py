@@ -1,6 +1,9 @@
 """
+CLASSIFICATION: MOVE TO RESEARCH
+
 Audit Stationarity.
 Runs Augmented Dickey-Fuller test on all features to identify non-stationary ones.
+Not part of production runtime paths.
 """
 
 import sys

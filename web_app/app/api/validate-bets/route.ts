@@ -1,53 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { spawn } from 'child_process';
+
+const API_BASE_URL = 'http://127.0.0.1:8000';
 
 export async function POST(request: NextRequest) {
   try {
-    const path = require('path');
-    const projectRoot = path.resolve(process.cwd(), '..');
-    const pythonPath = path.join(projectRoot, '.venv', 'Scripts', 'python.exe');
-    const scriptPath = path.join(projectRoot, 'src', 'analysis', 'bet_validator.py');
-
-    const result = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
-      const childProcess = spawn(pythonPath, [scriptPath], {
-        cwd: projectRoot,
-        env: { ...process.env, PYTHONUNBUFFERED: '1' }
-      });
-
-      let stdout = '';
-      let stderr = '';
-
-      childProcess.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-
-      childProcess.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      childProcess.on('close', (code) => {
-        if (code === 0) {
-          resolve({ stdout, stderr });
-        } else {
-          reject(new Error(`Validator failed (code ${code}): ${stderr}`));
-        }
-      });
-
-      childProcess.on('error', (err) => {
-        reject(new Error(`Failed to start validator: ${err.message}`));
-      });
+    const response = await fetch(`${API_BASE_URL}/api/validate-bets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
     });
 
-    // Parse output to get count
-    const lines = result.stdout.trim().split('\n');
-    const successLine = lines.find(l => l.includes('[SUCCESS]'));
-    const match = successLine?.match(/(\d+) bets processed/);
-    const validatedCount = match ? parseInt(match[1]) : 0;
+    const payload = await response.json();
+    if (!response.ok) {
+      const errorMessage = payload?.detail || payload?.error || 'Validation failed';
+      return NextResponse.json({ success: false, error: errorMessage }, { status: response.status });
+    }
 
     return NextResponse.json({
       success: true,
-      validated_count: validatedCount,
-      output: result.stdout
+      validated_count: payload.validated_count || 0,
+      output: payload.output || ''
     });
 
   } catch (error: any) {

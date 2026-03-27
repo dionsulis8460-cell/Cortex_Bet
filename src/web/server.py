@@ -1,4 +1,6 @@
 """
+CLASSIFICATION: MOVE TO LEGACY
+
 Servidor Web com SSE (Server-Sent Events) para Interface de Controle.
 
 Este módulo é o "Consultor" do sistema. Ele cria um site local onde você pode:

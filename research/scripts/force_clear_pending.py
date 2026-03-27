@@ -1,4 +1,11 @@
 
+"""
+CLASSIFICATION: MOVE TO RESEARCH
+
+Research-only emergency pending cleanup script.
+Not part of production runtime paths.
+"""
+
 import sys
 import os
 import sqlite3

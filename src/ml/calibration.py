@@ -394,14 +394,15 @@ def train_calibrator_from_history(db_manager, threshold=10.5, method='platt',
         CalibratedConfidence: Calibrador treinado
         float: ECE no conjunto de teste
     """
-    from src.ml.features_v2 import create_advanced_features
+    from src.features.feature_store import FeatureStore
     from src.models.model_v2 import ProfessionalPredictor
     
     print("🔄 Treinando calibrador com histórico completo...")
     
     # Carrega dados
     df = db_manager.get_historical_data()
-    X, y, timestamps = create_advanced_features(df)
+    feature_store = FeatureStore(db_manager)
+    X, y, timestamps = feature_store.get_training_features(df)
     
     # Split temporal (80% treino, 20% teste)
     split_idx = int(len(X) * 0.8)

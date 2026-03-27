@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { spawn } from 'child_process';
-import path from 'path';
+
+const API_BASE_URL = 'http://127.0.0.1:8000';
 
 // GET - Fetch user's bets and bankroll
 export async function GET(request: NextRequest) {
@@ -10,54 +10,18 @@ export async function GET(request: NextRequest) {
     // TODO: Get userId from Session/Auth. Defaulting to 1 for now.
     const userId = searchParams.get('userId') || '1';
 
-    // Dynamic Paths for GET
-    const path = require('path');
-    const projectRoot = path.resolve(process.cwd(), '..');
-    const pythonPath = path.join(projectRoot, '.venv', 'Scripts', 'python.exe');
-    const scriptPath = path.join(projectRoot, 'src', 'web', 'bankroll_api.py');
+    const response = await fetch(
+      `${API_BASE_URL}/api/bankroll?type=${encodeURIComponent(type)}&user_id=${encodeURIComponent(userId)}`,
+      { cache: 'no-store' },
+    );
+    const data = await response.json();
 
-    const result = await new Promise<string>((resolve, reject) => {
-      // Args: GET <type> <userId>
-      const childProcess = spawn(pythonPath, [scriptPath, 'GET', type, userId], {
-        cwd: projectRoot,
-        env: { ...process.env, PYTHONUNBUFFERED: '1' }
-      });
-
-      let stdout = '';
-      let stderr = '';
-
-      childProcess.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-
-      childProcess.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      childProcess.on('close', (code) => {
-        if (code === 0) {
-          resolve(stdout);
-        } else {
-          reject(new Error(`Bankroll script failed: ${stderr}`));
-        }
-      });
-
-      childProcess.on('error', (err) => {
-        reject(new Error(`Failed to start python script: ${err.message}`));
-      });
-    });
-
-    try {
-      const data = JSON.parse(result.trim());
-      if (data.error) {
-        // If error is insufficient funds or similar, return 400 but valid JSON
-        return NextResponse.json({ success: false, error: data.error }, { status: 400 });
-      }
-      return NextResponse.json({ success: true, data });
-    } catch (e) {
-      console.error('JSON Parse Error:', result);
-      return NextResponse.json({ success: false, error: 'Invalid JSON response from backend' }, { status: 500 });
+    if (!response.ok) {
+      const errorMessage = data?.detail || data?.error || 'Failed to load bankroll data';
+      return NextResponse.json({ success: false, error: errorMessage }, { status: response.status });
     }
+
+    return NextResponse.json({ success: true, data });
 
   } catch (error: any) {
     console.error('Bankroll GET error:', error);
@@ -78,33 +42,19 @@ export async function POST(request: NextRequest) {
       body.userId = 1;
     }
 
-    const pythonPath = 'C:\\Users\\OEM\\Desktop\\Cortex_Bet\\venv\\Scripts\\python.exe';
-    const scriptPath = 'C:\\Users\\OEM\\Desktop\\Cortex_Bet\\Cortex_Bet\\src\\web\\bankroll_api.py';
-
-    const result = await new Promise<string>((resolve, reject) => {
-      // Check if it's a transaction
-      if (body.action === 'transaction') {
-        // Args: TRANSACTION <user_id> <type> <amount>
-        const childProcess = spawn(pythonPath, [scriptPath, 'TRANSACTION', body.userId.toString(), body.type, body.amount.toString()], {
-          cwd: 'C:\\Users\\OEM\\Desktop\\Cortex_Bet\\Cortex_Bet',
-          env: { ...process.env, PYTHONUNBUFFERED: '1' }
-        });
-
-        handleSpawn(childProcess, resolve, reject, 'Transaction failed');
-
-      } else {
-        // Default: Place Bet
-        // Args: POST <json_body>
-        const childProcess = spawn(pythonPath, [scriptPath, 'POST', JSON.stringify(body)], {
-          cwd: 'C:\\Users\\OEM\\Desktop\\Cortex_Bet\\Cortex_Bet',
-          env: { ...process.env, PYTHONUNBUFFERED: '1' }
-        });
-
-        handleSpawn(childProcess, resolve, reject, 'Place bet failed');
-      }
+    const response = await fetch(`${API_BASE_URL}/api/bankroll`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      cache: 'no-store',
     });
+    const data = await response.json();
 
-    const data = JSON.parse(result.trim());
+    if (!response.ok) {
+      const errorMessage = data?.detail || data?.error || 'Bankroll operation failed';
+      return NextResponse.json({ success: false, error: errorMessage }, { status: response.status });
+    }
+
     return NextResponse.json({ success: true, data });
 
   } catch (error: any) {
@@ -114,28 +64,6 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-// Helper to avoid duplicate code
-function handleSpawn(childProcess: any, resolve: any, reject: any, errorMsg: string) {
-  let stdout = '';
-  let stderr = '';
-
-  childProcess.stdout.on('data', (data: any) => {
-    stdout += data.toString();
-  });
-
-  childProcess.stderr.on('data', (data: any) => {
-    stderr += data.toString();
-  });
-
-  childProcess.on('close', (code: number) => {
-    if (code === 0) {
-      resolve(stdout);
-    } else {
-      reject(new Error(`${errorMsg}: ${stderr}`));
-    }
-  });
 }
 
 // DELETE - Delete a bet / refund if pending
@@ -149,37 +77,20 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Missing bet ID' }, { status: 400 });
     }
 
-    const pythonPath = 'C:\\Users\\OEM\\Desktop\\Cortex_Bet\\venv\\Scripts\\python.exe';
-    const scriptPath = 'C:\\Users\\OEM\\Desktop\\Cortex_Bet\\Cortex_Bet\\src\\web\\bankroll_api.py';
+    const response = await fetch(
+      `${API_BASE_URL}/api/bankroll?id=${encodeURIComponent(id)}&user_id=${encodeURIComponent(userId)}`,
+      {
+        method: 'DELETE',
+        cache: 'no-store',
+      },
+    );
+    const data = await response.json();
 
-    const result = await new Promise<string>((resolve, reject) => {
-      // Args: DELETE <betId> <userId>
-      const childProcess = spawn(pythonPath, [scriptPath, 'DELETE', id, userId], {
-        cwd: 'C:\\Users\\OEM\\Desktop\\Cortex_Bet\\Cortex_Bet',
-        env: { ...process.env, PYTHONUNBUFFERED: '1' }
-      });
+    if (!response.ok) {
+      const errorMessage = data?.detail || data?.error || 'Delete bet failed';
+      return NextResponse.json({ success: false, error: errorMessage }, { status: response.status });
+    }
 
-      let stdout = '';
-      let stderr = '';
-
-      childProcess.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-
-      childProcess.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      childProcess.on('close', (code) => {
-        if (code === 0) {
-          resolve(stdout);
-        } else {
-          reject(new Error(`Delete bet failed: ${stderr}`));
-        }
-      });
-    });
-
-    const data = JSON.parse(result.trim());
     return NextResponse.json({ success: true, data });
 
   } catch (error: any) {

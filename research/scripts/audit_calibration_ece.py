@@ -1,6 +1,9 @@
 """
+CLASSIFICATION: MOVE TO RESEARCH
+
 Audit Calibration ECE.
 Calculates Expected Calibration Error for Multi-Threshold Calibrator on OOT data.
+Not part of production runtime paths.
 """
 
 import sys

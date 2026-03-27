@@ -1,44 +1,70 @@
-# Cortex Bet: AI & Statistical Engine (V6 Pro)
+# Cortex Bet: ML and Statistical Engine
 
 This document explains the inner workings of the machine learning and statistical layers that drive Cortex Bet's predictions.
 
-## 1. The ML Model: AI V6 Pro (V2.1 Calibrated)
+## 1. Production Modeling Scope
 
-The core predictor is a Gradient Boosted model (XGBoost/LightGBM) optimized for corner prediction.
+The production scope is currently pre-live total full-time over/under corner prediction. Runtime selection uses a model registry with one active champion and formal promotion policy.
 
-### Feature Engineering
+- Current champion: `neural_challenger_v1` (runtime adapter: `neural`)
+- Previous champion (retired): `ensemble_v1` (runtime adapter: `ensemble`)
+- Challenger policy: candidates should be maintained in `research/` and only promoted after reproducible evaluation.
 
-We process over 140 features for each match, including:
+### Canonical Feature Engineering
+
+Feature generation is centralized in `FeatureStore` for both training and inference to avoid train/serve skew.
+
+The pipeline processes temporal and contextual features, including:
 
 - **EMA Trends**: Exponential Moving Averages of corners (last 5, 10, 20 games).
 - **Home/Away Specialization**: Separate metrics for team performance based on venue.
 - **Defensive Resistance**: Corners conceded by opponents.
 - **Momentum Metrics**: Real-time pressure based on dangerous attacks and shots.
 
-### Calibration (Temperature Scaling)
+### Calibration
 
-Unlike standard models that provide "raw scores", V6 Pro uses a **Multi-Threshold Temperature Scaling** calibrator. This ensures that a confidence score of 70% actually results in a win 70% of the time, making it reliable for bankroll management.
+Model confidence is calibrated with a production calibrator so that predicted probabilities track empirical frequencies.
 
-## 2. Statistical Engine: Monte Carlo Simulation
+## 2. Statistical Layer
 
-For every match, we run a hybrid statistical analysis:
+For each match, the statistical layer combines model outputs with historical context and distributional assumptions.
 
 1. **Hybrid Lambda (λ)**: We combine the ML prediction (70% weight) with historical statistical averages (30% weight) to determine the "Expected Rate" of corners.
 2. **Distribution Selection**:
    - **Poisson**: Used when variance equals mean (standard games).
    - **Negative Binomial**: Used when variance > mean (high volatility games).
 3. **Simulation**: We run **10,000 simulations** of the match to build a probability distribution.
-4. **Fair Odas Calculation**: `Fair Odd = 1 / Probability`.
+4. **Fair Odds Calculation**: `Fair Odd = 1 / Probability`.
 
-## 3. Evaluation Metrics
+## 3. Evaluation Protocol
 
-We use three primary metrics to monitor AI health:
+Evaluation must follow temporal splits and include probabilistic quality, calibration and corner expectation error.
 
-- **Win Rate**: Percentage of correct predictions.
+Primary metrics:
+
 - **RPS (Ranked Probability Score)**: Measures how close the predicted probability was to the actual outcome.
 - **ECE (Expected Calibration Error)**: Measures the gap between predicted confidence and observed accuracy.
 - **MAE (Mean Absolute Error)**: Average difference between predicted corner count and real outcome.
 
-## 4. UTC & Regional Settings
+Secondary metrics:
+
+- ROI / yield / drawdown can be tracked, but never used as the only model selection criterion.
+
+Minimum reporting cuts:
+
+- By league
+- By season
+
+## 4. Serving and Governance
+
+- Official backend: FastAPI in `src/api/server.py`.
+- Official frontend: Next.js in `web_app`.
+- Canonical training entrypoint: `scripts/train_model.py`.
+- Canonical neural auxiliary training: `src/ml/train_neural.py`.
+- Canonical inference entrypoint: `scripts/run_scanner.py`.
+- Registry operations: `scripts/model_registry_cli.py`.
+- Health monitoring: `scripts/check_model_health.py` and `/api/model-health`.
+
+## 5. UTC and Regional Settings
 
 The system is optimized for **UTC-3 (Brasil)**. All performance metrics and scanner logic explicitly handle the -3 hour offset to ensure games from late-night Brazil don't leak into the wrong calendar day.

@@ -1,3 +1,9 @@
+"""
+CLASSIFICATION: MOVE TO RESEARCH
+
+Research-only drift diagnostics module.
+Not part of production runtime paths.
+"""
 
 import pandas as pd
 import numpy as np

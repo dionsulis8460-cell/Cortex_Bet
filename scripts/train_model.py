@@ -10,6 +10,7 @@ from datetime import datetime
 sys.path.append(os.getcwd())
 
 from src.database.db_manager import DBManager
+from src.features.feature_store import FeatureStore
 from src.models.model_v2 import ProfessionalPredictor
 from src.training.trainer import train_model as legacy_train_mode # Compatibility
 # from src.domain.bayesian import BayesianAnalytics # Uncomment when PyMC is fully configured
@@ -26,6 +27,7 @@ def train_pipeline(args):
     # 1. Data Ingestion
     db = DBManager()
     df = db.get_historical_data()
+    db.close()
     
     if df.empty:
         print("⚠️ No historical data found in database. Cannot train.")
@@ -33,15 +35,14 @@ def train_pipeline(args):
 
     print(f"📊 Loaded {len(df)} historical matches for training.")
 
-    # Feature Engineering (Real Production Logic)
-    print("🔧 Generating Advanced Features (PhD Standard)...")
-    from src.ml.features_v2 import create_advanced_features
-    # Assuming df is the raw historical data
+    # Feature Engineering (Canonical Path)
+    print("🔧 Generating canonical features via FeatureStore...")
     try:
-        X, y, timestamps, _ = create_advanced_features(df)
+        feature_store = FeatureStore(db)
+        X, y, timestamps = feature_store.get_training_features(df)
         print(f"   ✅ Features generated: {X.shape}")
-    except ImportError:
-        print("   ⚠️ Could not import features_v2. Falling back to simple/mock data for structure check.")
+    except Exception as exc:
+        print(f"   ⚠️ Could not generate canonical training features: {exc}")
         return
 
     # 2. Experiment Tracking Setup

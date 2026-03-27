@@ -6,15 +6,20 @@ echo ====================================================
 echo      CORTEX BET - INITIALIZING...
 echo ====================================================
 
-:: Path configuration
-set PROJECT_ROOT=c:\Users\Valmont\Desktop\Cortex_Bet
-set VENV_ACTIVATE=%PROJECT_ROOT%\.venv\Scripts\activate.bat
+:: Path configuration based on current script location
+set SCRIPT_DIR=%~dp0
+set PROJECT_ROOT=%SCRIPT_DIR:~0,-1%
+set PYTHON_EXE=%PROJECT_ROOT%\.venv\Scripts\python.exe
 
-echo [1/2] Starting System (Backend) in new window...
-start cmd /k "cd /d %PROJECT_ROOT% && call %VENV_ACTIVATE% && echo Starting System... && python start_system.py"
+if not exist "%PYTHON_EXE%" (
+	echo [ERROR] Python virtual environment not found at:
+	echo         %PYTHON_EXE%
+	pause
+	exit /b 1
+)
 
-echo [2/2] Starting Dashboard (Frontend)...
-cd /d %PROJECT_ROOT%\web_app
-npm run dev
+echo [1/1] Starting unified local stack...
+cd /d %PROJECT_ROOT%
+"%PYTHON_EXE%" start_system.py
 
 pause

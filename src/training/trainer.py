@@ -14,7 +14,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.database.db_manager import DBManager
-from src.ml.features_v2 import create_advanced_features
+from src.features.feature_store import FeatureStore
 from src.models.model_v2 import ProfessionalPredictor
 from src.utils.reproducibility import set_global_seeds, save_run_metadata, get_dataset_hash
 
@@ -90,11 +90,11 @@ def train_model(args=None) -> None:
     df = _fix_column_names(df)
     
     print("\n🚀 Iniciando Treinamento Cortex V2.1 (Academic Stable)...")
-    print("🔧 Gerando features avançadas (Home/Away, H2H, Momentum)...")
+    print("🔧 Gerando features canônicas via FeatureStore...")
     
     try:
-        # AUDIT FIX: unpacking 4 values
-        X, y, timestamps, _ = create_advanced_features(df, window_short=3, window_long=5)
+        feature_store = FeatureStore(db)
+        X, y, timestamps = feature_store.get_training_features(df)
         
         print(f"📊 Features geradas: {X.shape[1]} colunas, {X.shape[0]} amostras")
         odds = None # No odds support in current feature set

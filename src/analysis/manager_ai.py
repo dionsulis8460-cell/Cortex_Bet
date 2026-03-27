@@ -20,6 +20,7 @@ from src.domain.models import PredictionResult
 from src.features.feature_store import FeatureStore
 from src.models.model_v2 import ProfessionalPredictor
 from src.models.neural_engine import NeuralChallenger
+from src.models.model_registry import ModelRegistry
 from src.analysis.statistical import StatisticalAnalyzer
 from src.ml.calibration import MultiThresholdCalibrator
 
@@ -44,6 +45,12 @@ class ManagerAI:
         
         # 3. Load Calibrator
         self.calibrator = self._load_calibrator()
+
+        # 4. Resolve runtime roles from registry (with safe fallback)
+        self.registry = self._load_registry()
+        self.runtime_champion_id = "ensemble_v1"
+        self.runtime_challenger_id = "neural_challenger_v1"
+        self._resolve_runtime_model_roles()
         
     def _load_ensemble(self):
         try:
@@ -62,6 +69,59 @@ class ManagerAI:
         except Exception as e:
             print(f"ManagerAI: Calibrator load warning: {e}")
             return None
+
+    def _load_registry(self):
+        """Load model registry when available; fallback to legacy fixed roles on failure."""
+        try:
+            return ModelRegistry()
+        except Exception as e:
+            print(f"ManagerAI: Registry load warning: {e}")
+            return None
+
+    def _resolve_runtime_model_roles(self):
+        """
+        Resolve active champion/challenger model IDs from registry.
+
+        Fallback defaults preserve legacy behavior:
+            champion=ensemble_v1, challenger=neural_challenger_v1
+        """
+        if self.registry is None:
+            print("ManagerAI: Registry unavailable. Using legacy runtime roles.")
+            return
+
+        try:
+            roles = self.registry.get_runtime_roles()
+            champion_id = roles["champion_id"]
+            challenger_id = roles["challenger_id"]
+
+            self.runtime_champion_id = champion_id
+            self.runtime_challenger_id = challenger_id
+            print(
+                "ManagerAI: Runtime roles loaded from registry "
+                f"(champion={self.runtime_champion_id}, challenger={self.runtime_challenger_id})."
+            )
+        except Exception as e:
+            print(f"ManagerAI: Registry role resolution warning: {e}")
+
+    def _model_total_from_id(self, model_id: str, features_vector: pd.DataFrame) -> float:
+        """Return total corner expectation for a model ID using configurable runtime adapters."""
+        adapter = None
+        if self.registry is not None:
+            try:
+                adapter = self.registry.get_runtime_adapter(model_id)
+            except Exception:
+                adapter = None
+
+        # Backward-compatible fallback when registry adapter is unavailable.
+        if adapter is None:
+            adapter = "neural" if "neural" in model_id.lower() else "ensemble"
+
+        if adapter == "neural":
+            l_home, l_away = self.neural.predict_lambda(features_vector)
+            return float(l_home + l_away)
+
+        # Default adapter is ensemble.
+        return float(self.ensemble.predict(features_vector)[0])
 
     def predict_match(self, match_id: int, match_metadata: Optional[Dict[str, Any]] = None) -> PredictionResult:
         """
@@ -104,41 +164,40 @@ class ManagerAI:
             match_id, home_id, away_id
         )
         
-        # 3. Ensemble Inference (Main)
-        ensemble_raw = float(self.ensemble.predict(features_vector)[0])
+        # 3. Raw per-model inference (kept for compatibility fields in PredictionResult)
+        ensemble_raw = self._model_total_from_id("ensemble_v1", features_vector)
+        neural_total = self._model_total_from_id("neural_challenger_v1", features_vector)
 
-        # 4. Neural Challenger Inference
-        # BUGFIX: Moved BEFORE _find_best_line so that neural_total is available
-        # when selecting the market line. Previously, neural_total was referenced
-        # on the line BEFORE it was assigned, causing _find_best_line to always
-        # fall back to ensemble_raw for neural_mu (bug: 'neural_total' never in locals()).
-        neural_home, neural_away = self.neural.predict_lambda(features_vector)
-        neural_total = neural_home + neural_away
+        # 4. Registry-driven runtime roles (effective champion/challenger in inference path)
+        champion_raw = self._model_total_from_id(self.runtime_champion_id, features_vector)
+        challenger_raw = self._model_total_from_id(self.runtime_challenger_id, features_vector)
 
         # Business Logic: Determine Best Line (Dynamic Value Analysis)
         line_val, pick, is_over, prob_score = self._find_best_line(
-            projected_mu=ensemble_raw,
-            neural_mu=neural_total
+            projected_mu=champion_raw,
+            neural_mu=challenger_raw
         )
         
         # 5. Calibration
         ensemble_conf = self._get_confidence(ensemble_raw, line_val, is_over)
+        champion_conf = self._get_confidence(champion_raw, line_val, is_over)
         
         # Neural Confidence (Probabilistic)
         from scipy.stats import poisson
         if is_over:
             neural_conf = 1 - poisson.cdf(int(line_val), neural_total)
+            challenger_conf = 1 - poisson.cdf(int(line_val), challenger_raw)
         else:
             neural_conf = poisson.cdf(int(line_val), neural_total)
+            challenger_conf = poisson.cdf(int(line_val), challenger_raw)
             
         # 6. Consensus & Final Decision
         agreement = 1.0
-        # If Neural supports the direction, boost confidence
-        if (is_over and neural_total > line_val) or \
-           (not is_over and neural_total < line_val):
-            agreement = 1.1 
-            
-        final_conf = (ensemble_conf * 0.5 + prob_score * 0.5) * agreement
+        if (is_over and challenger_raw > line_val) or \
+           (not is_over and challenger_raw < line_val):
+            agreement = 1.1
+
+        final_conf = (champion_conf * 0.5 + prob_score * 0.5) * agreement
         final_conf = min(0.95, final_conf)
         
         # P2-A FIX: Cálculo de Odd Justa (Fair Odds)
@@ -192,7 +251,7 @@ class ManagerAI:
             market_opportunities, suggestions, tactical_data = self.statistical.analyze_match(
                 df_home=h_history,
                 df_away=a_history,
-                ml_prediction=ensemble_raw,
+                ml_prediction=champion_raw,
                 match_name=f"{home_name} vs {away_name}",
                 advanced_metrics=advanced_metrics
             )
@@ -201,13 +260,21 @@ class ManagerAI:
             print(f"Statistical Engine Error: {e}")
 
         # Text Feedback
-        feedback = (f"Ensemble: {ensemble_raw:.1f} | Neural: {neural_total:.1f}\n"
-                    f"Consensus: {'High' if agreement > 1 else 'Normal'}")
+        feedback = (
+            f"Champion({self.runtime_champion_id}): {champion_raw:.1f} | "
+            f"Challenger({self.runtime_challenger_id}): {challenger_raw:.1f}\n"
+            f"Ensemble: {ensemble_raw:.1f} | Neural: {neural_total:.1f} | "
+            f"Consensus: {'High' if agreement > 1 else 'Normal'}"
+        )
         
         # [DEBUG PREDICT] - Restored
         print(f"\n[DEBUG PREDICT] Match: {home_name} vs {away_name}")
+        print(f"[DEBUG PREDICT] Champion ID:      {self.runtime_champion_id}")
+        print(f"[DEBUG PREDICT] Challenger ID:    {self.runtime_challenger_id}")
         print(f"[DEBUG PREDICT] Ensemble Output: {ensemble_raw:.4f}")
         print(f"[DEBUG PREDICT] Neural Output:   {neural_total:.4f}")
+        print(f"[DEBUG PREDICT] Champion Output: {champion_raw:.4f}")
+        print(f"[DEBUG PREDICT] Challenger Out:  {challenger_raw:.4f}")
         print(f"[DEBUG PREDICT] Line Selected:   {line_val} ({pick})")
         print(f"[DEBUG PREDICT] Confidence:      {final_conf:.1%}")
         

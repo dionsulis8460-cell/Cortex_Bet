@@ -1,4 +1,6 @@
 """
+CLASSIFICATION: MOVE TO LEGACY
+
 Módulo de Scanner de Oportunidades para Interface Web.
 
 Regra de Negócio:

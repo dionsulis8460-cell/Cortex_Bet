@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { spawn } from 'child_process';
-import path from 'path';
+
+const API_BASE_URL = 'http://127.0.0.1:8000';
 
 // POST - Authenticate user
 export async function POST(request: NextRequest) {
@@ -12,53 +12,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Missing credentials' }, { status: 400 });
     }
 
-    // Dynamic Paths
-    const path = require('path');
-    const projectRoot = path.resolve(process.cwd(), '..');
-    const pythonPath = path.join(projectRoot, '.venv', 'Scripts', 'python.exe');
-    const scriptPath = path.join(projectRoot, 'src', 'web', 'bankroll_api.py');
-
-    const result = await new Promise<string>((resolve, reject) => {
-      // Args: AUTH <username> <password>
-      const childProcess = spawn(pythonPath, [scriptPath, 'AUTH', username, password], {
-        cwd: projectRoot,
-        env: { ...process.env, PYTHONUNBUFFERED: '1' }
-      });
-
-      let stdout = '';
-      let stderr = '';
-
-      childProcess.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-
-      childProcess.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      childProcess.on('close', (code) => {
-        if (code === 0) {
-          resolve(stdout);
-        } else {
-          reject(new Error(`Auth failed: ${stderr}`));
-        }
-      });
-
-      childProcess.on('error', (err) => {
-        reject(new Error(`Failed to start auth script: ${err.message}`));
-      });
+    const response = await fetch(`${API_BASE_URL}/api/auth`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+      cache: 'no-store',
     });
 
-    try {
-      const data = JSON.parse(result.trim());
-      if (data.error) {
-        return NextResponse.json({ success: false, error: data.error }, { status: 401 });
-      }
-      return NextResponse.json({ success: true, data });
-    } catch (e) {
-      console.error('JSON Parse Error:', result);
-      return NextResponse.json({ success: false, error: 'Invalid JSON response from backend' }, { status: 500 });
+    const payload = await response.json();
+    if (!response.ok) {
+      const errorMessage = payload?.detail || payload?.error || 'Authentication failed';
+      return NextResponse.json({ success: false, error: errorMessage }, { status: response.status });
     }
+
+    return NextResponse.json({ success: true, data: payload });
 
   } catch (error: any) {
     console.error('Auth API error:', error);

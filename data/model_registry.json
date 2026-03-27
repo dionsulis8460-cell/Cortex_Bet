@@ -1,0 +1,77 @@
+{
+  "schema_version": "1.0",
+  "current_champion": "neural_challenger_v1",
+  "promotion_policy": {
+    "min_brier_improvement_pct": 3.0,
+    "min_log_loss_improvement_pct": 3.0,
+    "min_eval_matches": 150
+  },
+  "models": {
+    "ensemble_v1": {
+      "name": "ProfessionalPredictor",
+      "role": "RETIRED",
+      "runtime_adapter": "ensemble",
+      "artifact_paths": [
+        "data/corner_model_v2_professional.pkl"
+      ],
+      "registered_at": "2026-03-27T00:00:00+00:00",
+      "metrics": {
+        "brier_score": null,
+        "log_loss": null,
+        "n_eval_matches": null
+      }
+    },
+    "neural_challenger_v1": {
+      "name": "NeuralChallenger",
+      "role": "CHAMPION",
+      "runtime_adapter": "neural",
+      "artifact_paths": [
+        "models/neural_challenger_mlp.joblib",
+        "models/neural_scaler.joblib"
+      ],
+      "registered_at": "2026-03-27T00:00:00+00:00",
+      "metrics": {
+        "brier_score": 0.2161,
+        "log_loss": 0.3533,
+        "n_eval_matches": 200
+      }
+    }
+  },
+  "audit_trail": [
+    {
+      "event": "REGISTERED",
+      "model_id": "ensemble_v1",
+      "role": "CHAMPION",
+      "timestamp": "2026-03-27T00:00:00+00:00",
+      "reason": "Bootstrap inicial — ProfessionalPredictor (LightGBM+XGBoost+CatBoost+Ridge stacking) era o modelo de producao implicito antes da formalizacao do registry."
+    },
+    {
+      "event": "REGISTERED",
+      "model_id": "neural_challenger_v1",
+      "role": "CHALLENGER",
+      "timestamp": "2026-03-27T00:00:00+00:00",
+      "reason": "Bootstrap inicial — NeuralChallenger (MLPRegressor multi-output) coexistia no ManagerAI sem registro formal. Classificado como CHALLENGER pendente de avaliacao formal com n_eval_matches >= 150."
+    },
+    {
+      "event": "RETIRED",
+      "model_id": "ensemble_v1",
+      "from_role": "CHAMPION",
+      "timestamp": "2026-03-27T13:30:42.050794+00:00",
+      "superseded_by": "neural_challenger_v1",
+      "reason": "Promoção real após treino/calibração"
+    },
+    {
+      "event": "PROMOTED",
+      "model_id": "neural_challenger_v1",
+      "from_role": "CHALLENGER",
+      "to_role": "CHAMPION",
+      "timestamp": "2026-03-27T13:30:42.050794+00:00",
+      "metrics_at_promotion": {
+        "brier_score": 0.2161,
+        "log_loss": 0.3533,
+        "n_eval_matches": 200
+      },
+      "reason": "Promoção real após treino/calibração"
+    }
+  ]
+}

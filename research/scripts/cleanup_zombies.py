@@ -1,4 +1,11 @@
 
+"""
+CLASSIFICATION: MOVE TO RESEARCH
+
+Research-only maintenance script for pending prediction cleanup.
+Not part of production runtime paths.
+"""
+
 import sys
 import os
 import sqlite3

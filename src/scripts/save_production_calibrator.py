@@ -23,7 +23,7 @@ from scipy.stats import poisson
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 from src.database.db_manager import DBManager
-from src.ml.features_v2 import create_advanced_features
+from src.features.feature_store import FeatureStore
 from src.models.model_v2 import ProfessionalPredictor
 from src.ml.calibration import CalibratedConfidence
 from src.ml.focal_calibration import TemperatureScaling
@@ -37,7 +37,9 @@ def save_calibrator():
     print("📂 Carregando dados históricos...")
     db = DBManager()
     df = db.get_historical_data()
-    X, y, timestamps, _ = create_advanced_features(df)
+    feature_store = FeatureStore(db)
+    X, y, timestamps = feature_store.get_training_features(df)
+    db.close()
     
     # 2. Split (Manter consistência com validação: 80% Modelo / 20% Calibração)
     # Em produção, poderíamos usar Cross-Validation, mas para calibração pós-hoc

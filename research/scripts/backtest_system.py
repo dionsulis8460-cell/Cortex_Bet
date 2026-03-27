@@ -1,3 +1,10 @@
+"""
+CLASSIFICATION: MOVE TO RESEARCH
+
+Research-only backtesting system script.
+Not part of production runtime paths.
+"""
+
 import sys
 import os
 import pandas as pd

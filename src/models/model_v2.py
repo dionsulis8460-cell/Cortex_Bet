@@ -805,10 +805,10 @@ class ProfessionalPredictor(BasePredictor):
 # Função auxiliar para retrocompatibilidade
 def prepare_improved_features(df: pd.DataFrame) -> tuple:
     """
-    Wrapper para o novo módulo de features.
+    Wrapper para o caminho canônico de features via FeatureStore.
     
     Mantido para retrocompatibilidade com código existente.
-    Recomenda-se usar diretamente features_v2.create_advanced_features().
+    Recomenda-se usar diretamente FeatureStore.get_training_features().
     
     Args:
         df: DataFrame com dados históricos.
@@ -816,6 +816,7 @@ def prepare_improved_features(df: pd.DataFrame) -> tuple:
     Returns:
         tuple: (X, y, timestamps)
     """
-    from src.ml.features_v2 import create_advanced_features
-    X, y, df_features = create_advanced_features(df)
-    return X, y, df_features['start_timestamp']
+    from src.features.feature_store import FeatureStore
+
+    feature_store = FeatureStore(None)
+    return feature_store.get_training_features(df)

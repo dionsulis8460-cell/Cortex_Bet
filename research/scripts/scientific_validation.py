@@ -1,4 +1,6 @@
 """
+CLASSIFICATION: MOVE TO RESEARCH
+
 Comprehensive Validation & Scientific Report Generator
 Tests both Analyst AI and Manager AI, generates academic report
 """

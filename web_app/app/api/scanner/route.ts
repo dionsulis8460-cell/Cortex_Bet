@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { spawn } from 'child_process';
-import path from 'path';
+
+const API_BASE_URL = 'http://127.0.0.1:8000';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,93 +13,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Paths
-    // Paths
-    // process.cwd() is web_app/
-    // projectRoot is Cortex_Bet/ (the repo root)
-    const projectRoot = path.resolve(process.cwd(), '..');
-
-    // Venv is inside projectRoot (.venv)
-    const pythonPath = path.join(projectRoot, '.venv', 'Scripts', 'python.exe');
-
-    // Script is in scripts/run_scanner.py
-    const scriptPath = path.join(projectRoot, 'scripts', 'run_scanner.py');
-
-    // Validate paths
-    const fs = require('fs');
-    if (!fs.existsSync(pythonPath)) {
-      return NextResponse.json(
-        { error: `Python not found at: ${pythonPath}` },
-        { status: 500 }
-      );
-    }
-
-    if (!fs.existsSync(scriptPath)) {
-      return NextResponse.json(
-        { error: `Scanner script not found at: ${scriptPath}` },
-        { status: 500 }
-      );
-    }
-
-    // Execute scanner
-    const result = await new Promise<{ success: boolean; output: string; matchesProcessed: number }>((resolve, reject) => {
-      const childProcess = spawn(pythonPath, [scriptPath, '--date', date], {
-        cwd: projectRoot,
-        env: { ...process.env, PYTHONUNBUFFERED: '1' }
-      });
-
-      let stdout = '';
-      let stderr = '';
-
-      childProcess.stdout.on('data', (data) => {
-        const text = data.toString();
-        // Log to server terminal for user to see
-        process.stdout.write(text);
-        stdout += text;
-      });
-
-      childProcess.stderr.on('data', (data) => {
-        const text = data.toString();
-        // Log to server error stream
-        process.stderr.write(text);
-        stderr += text;
-      });
-
-      childProcess.on('close', (code) => {
-        if (code === 0) {
-          try {
-            // Try to parse JSON output from scanner
-            const lines = stdout.trim().split('\n');
-            const lastLine = lines[lines.length - 1];
-            const result = JSON.parse(lastLine);
-            resolve({
-              success: true,
-              output: stdout,
-              matchesProcessed: result.matches_processed || 0
-            });
-          } catch {
-            // Fallback if no JSON output
-            resolve({
-              success: true,
-              output: stdout,
-              matchesProcessed: 0
-            });
-          }
-        } else {
-          reject(new Error(`Scanner failed with code ${code}: ${stderr}`));
-        }
-      });
-
-      childProcess.on('error', (err) => {
-        reject(new Error(`Failed to start scanner: ${err.message}`));
-      });
+    const response = await fetch(`${API_BASE_URL}/api/scanner`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date }),
+      cache: 'no-store',
     });
+
+    const payload = await response.json();
+    if (!response.ok) {
+      const errorMessage = payload?.detail || payload?.error || 'Scanner execution failed';
+      return NextResponse.json({ error: errorMessage }, { status: response.status });
+    }
 
     return NextResponse.json({
       success: true,
       message: 'Scanner completed successfully',
-      matchesProcessed: result.matchesProcessed,
-      output: result.output
+      matchesProcessed: payload.matchesProcessed || payload.matches_processed || 0,
+      output: payload.output || ''
     });
 
   } catch (error: any) {

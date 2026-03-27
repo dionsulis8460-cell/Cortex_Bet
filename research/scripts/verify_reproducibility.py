@@ -1,4 +1,6 @@
 """
+CLASSIFICATION: MOVE TO RESEARCH
+
 Reproducibility Verification Script.
 Runs training twice and asserts bit-exact constraint on the output model.
 """

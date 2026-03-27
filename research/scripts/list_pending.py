@@ -1,4 +1,11 @@
 
+"""
+CLASSIFICATION: MOVE TO RESEARCH
+
+Research-only pending predictions debug listing.
+Not part of production runtime paths.
+"""
+
 import sys
 import os
 import sqlite3
