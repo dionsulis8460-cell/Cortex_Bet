@@ -1,0 +1,6 @@
+RELATÓRIO DE CALIBRAÇÃO V2 (3-Way Split)
+========================================
+Over 9.5: ECE = 0.2516
+Over 10.5: ECE = 0.3061
+Over 11.5: ECE = 0.3594
+Over 12.5: ECE = 0.4007

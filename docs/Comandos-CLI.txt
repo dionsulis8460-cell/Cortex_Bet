@@ -1,0 +1,175 @@
+# Comandos CLI - Cortex Bet V5.0
+
+## 🤖 Treinamento Completo das IAs (Ordem Obrigatória)
+
+Para treinar o sistema com o máximo de precisão, você deve rodar **obrigatoriamente** o treinamento das duas IAs que compõem o motor preditivo:
+
+**1. Treinar IA Principal (Ensemble LightGBM + XGBoost + CatBoost):**
+```powershell
+.venv\Scripts\python scripts/train_model.py --experiment "Cortex_V5_Production" --optuna --trials 500
+```
+
+**2. Treinar IA Auxiliar (Rede Neural MLP):**
+```powershell
+.venv\Scripts\python src/ml/train_neural.py --experiment "Cortex_V5_Neural_Prod" --trials 500
+```
+
+---
+
+## ⚙️ Ativar Ambiente Virtual
+
+```powershell
+& c:/Users/Valmont/Desktop/Cortex_Bet/.venv/Scripts/Activate.ps1
+```
+
+---
+
+## 🤖 Treinar IAs (Optuna - Recomendado)
+
+**Sistema possui 2 IAs:**
+
+1. **Analyst AI (ProfessionalPredictor)** - Ensemble Multi-Modelo
+   - Usado no CLI opção 7 (Scanner) para gerar predições base
+   - **Algoritmos:** **LightGBM + XGBoost + CatBoost** (Stacking Ensemble)
+   - Distribuições: Tweedie (LightGBM), Poisson (XGBoost, CatBoost)
+   - Meta-Learner: Ridge Regression com votação ponderada automática
+   - Acurácia atual: 65% → Meta: 68-69% (pós-ensemble v3.0)
+
+2. **Manager AI (SelectionStrategy)** - Ranqueamento inteligente
+   - Usado no Scanner para selecionar Top 7 melhores picks do dia
+   - Critérios: Probabilidade calibrada + Fair Odds + Edge
+   - Acurácia atual: 100% (7/7)
+
+**Comandos de Treinamento (Completos e Robustos):**
+
+Para manter **100% das inteligências do Cortex Bet** perfeitamente calibradas e atualizadas para a Manager AI (Scanner), você deve executar ambos os comandos abaixo em sequência:
+
+**1º Passo: Treinar Motor Principal e Calibrador (Analyst AI via Ensemble V3.0):**
+```powershell
+python scripts/train_model.py --experiment "Cortex_V5_Production" --optuna --trials 100
+```
+*Nota: Aumente trials para 100+ em produção real para maximizar a otimização de hiperparâmetros.*
+
+**2º Passo: Treinar a Rede Neural Auxiliar (Para apoiar a Manager AI / Safety Over):**
+```powershell
+python src/ml/train_neural.py --experiment "Cortex_V5_Neural_Prod" --trials 100
+```
+
+**Configuração Atual:**
+- Mode: Full Production Pipeline
+- Modelos: LightGBM + XGBoost + CatBoost (Stacking)
+- Otimização: Optuna (Hyperparameters)
+- Calibração: Automática (Isotonic/Sigmoid)
+
+---
+
+## 📡 Scanner de Oportunidades
+
+Executa ambas as IAs em sequência:
+1. Analyst AI prevê todos os jogos do dia
+2. Manager AI seleciona Top 7
+
+```powershell
+.venv\Scripts\python src/main.py
+# Escolher: 7 (Scanner de Oportunidades)
+```
+
+---
+
+## 📊 Atualizar Dados
+
+**Brasileirão Série A:**
+```powershell
+.venv\Scripts\python src/main.py
+# Escolher: 1 (Atualizar Campeonato Brasileiro)
+```
+
+**Liga Específica:**
+```powershell
+.venv\Scripts\python src/main.py
+# Escolher: 5 (Atualizar Liga Específica)
+```
+
+**Jogo Específico (URL SofaScore):**
+```powershell
+.venv\Scripts\python src/main.py
+# Escolher: 6 (Atualizar Jogo por URL)
+```
+
+---
+
+## 🔬 Validação Científica
+
+Gera relatório completo em `docs/validation_report.md`:
+
+```powershell
+.venv\Scripts\python src/scripts/scientific_validation.py
+```
+
+---
+
+## 👤 Gerenciar Usuários
+
+**Criar usuário:**
+```powershell
+python scripts/user_manager.py create amigo1 --password senha123
+```
+
+**Depositar saldo:**
+```powershell
+python scripts/user_manager.py deposit amigo1 100
+```
+
+---
+
+## 🧹 Manutenção
+
+**Limpar histórico de predições (GREEN/RED):**
+```powershell
+.venv\Scripts\python src/main.py
+# Escolher: 10 (Limpar Histórico)
+```
+
+**Reset total (zerar apostas e bancas):**
+```powershell
+.venv\Scripts\python src/main.py
+# Escolher: 12 (RESET TOTAL)
+```
+
+---
+
+## 📈 Modelos Disponíveis
+
+### Analyst AI (Principal)
+- 🤖 **IA Avançada (Cortex V2.1 Calibrated):** 1 predição principal
+- Exemplo: "Under 10.5 Corners"
+- Usa Temperature Scaling para calibração probabilística
+
+### Heurísticos (Estatísticos)
+- 📊 **Modelos Estatísticos:** 9 predições baseadas em tendências
+- Exemplos: "Total Under 12.5" (Segurança), "Casa Under 6.5", "1T Under 5.5"
+- Cobertura de diferentes cenários de risco
+
+### Challenger (Neural - Shadow Mode)
+- 🧠 **Rede Neural (Experimental):** Treina em modo sombra
+- Arquitetura: Multi-Output MLP (Home Corners, Away Corners)
+- Otimização: Optuna (Hyperparameter Tuning)
+
+```powershell
+python src/ml/train_neural.py --experiment "Cortex_V5_Neural" --trials 100
+```
+
+## 🏥 Validação de Saúde (Health Check)
+Verificar a performance recente (últimos 300 jogos) de ambos os motores:
+
+```powershell
+.venv\Scripts\python src/scripts/validate_health.py
+```
+
+## 📝 Notas Importantes
+
+- Sempre use `.venv` (não `venv`)
+- Antes de treinar, atualize o banco com jogos recentes
+- Scanner funciona melhor com dados atualizados (últimas 24h)
+- Para produção: aumentar Optuna trials para 100+
+```

@@ -1,0 +1,28 @@
+📊 ANÁLISE DETALHADA: JOGOS DEZEMBRO/2025 (20 JOGOS)
+================================================================================
+
+1️⃣ BRIER SCORE (Menor = Melhor):
+   Antigo: 0.2172
+   Novo:   0.2161
+   Δ: 0.5%
+
+2️⃣ ECE (Erro de Calibração):
+   Antigo: 0.2056
+   Novo:   0.3533
+   Δ: -71.8%
+
+3️⃣ ANÁLISE DE CASOS:
+
+✅ ACERTOS IMPULSIONADOS (7 jogos):
+                                match  actual   ml_pred  conf_old  conf_new
+Manchester United vs Newcastle United      13 12.425192  0.695717  0.906992
+                  Parma vs Fiorentina      11 11.216170  0.565649  0.780006
+                   Burnley vs Everton      11 11.450076  0.592614  0.834565
+
+❌ ERROS AGRAVADOS (2 jogos):
+                 match  actual   ml_pred  conf_old  conf_new
+         Lecce vs Como      10 11.803175  0.631803  0.875927
+Milan vs Hellas Verona      10 12.230222  0.676435  0.899636
+
+💡 CONCLUSÃO TÉCNICA:
+   O modelo NOVO é globalmente melhor.

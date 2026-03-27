@@ -1,0 +1,61 @@
+================================================================================
+CORTEX PRO - GUIA DE FORMATOS DE APOSTA (LIQUIDAÇÃO AUTOMÁTICA)
+================================================================================
+
+Este guia lista os termos que o sistema reconhece para validar automaticamente 
+suas apostas no Boletim assim que o jogo termina.
+
+--------------------------------------------------------------------------------
+1. PALAVRAS-CHAVE RECONHECIDAS
+--------------------------------------------------------------------------------
+
+MANDANTE (Casa):
+  - Casa
+  - Home
+  - Mandante
+
+VISITANTE (Away):
+  - Vis.
+  - Vis 
+  - Away
+  - Visitante
+
+PERÍODOS:
+  - 1T ou HT (1º Tempo)
+  - 2T, 2ST ou ST (2º Tempo)
+  - [Vazio] (Se não colocar nada, o sistema assume o Jogo Inteiro / FT)
+
+MERCADO:
+  - Over (Mais de)
+  - Under (Menos de)
+
+--------------------------------------------------------------------------------
+2. EXEMPLOS PRÁTICOS (RECOMENDADOS)
+--------------------------------------------------------------------------------
+
+JOGO INTEIRO (Full Time):
+  - "Over 9.5"           (Total de cantos no jogo)
+  - "Casa Under 5.5"     (Cantos apenas do Mandante)
+  - "Vis. Over 4.5"      (Cantos apenas do Visitante)
+
+1º TEMPO (1st Half):
+  - "1T Over 4.5"        (Total de cantos no 1T)
+  - "Casa Under 2.5 1T"  (Cantos do Mandante no 1T)
+  - "Vis. Over 1.5 1T"   (Cantos do Visitante no 1T)
+
+2º TEMPO (2nd Half):
+  - "2T Over 5.5"        (Total de cantos no 2T)
+  - "Casa Under 1.5 2T"  (Cantos do Mandante no 2T)
+  - "Vis. Over 2.5 2T"   (Cantos do Visitante no 2T)
+
+--------------------------------------------------------------------------------
+3. RECOMENDAÇÕES DE OURO
+--------------------------------------------------------------------------------
+
+* ESPAÇOS: Sempre coloque um espaço entre a palavra e o número (Ex: Over 2.5).
+* PONTO: Use ponto (.) para decimais, não vírgula (Ex: 2.5).
+* 2º TEMPO: O sistema calcula o 2º tempo subtraindo o HT do FT automaticamente.
+
+Se você seguir esse padrão, o sistema marcará sua aposta como GREEN ou RED 
+automaticamente no Histórico de Apostas.
+================================================================================

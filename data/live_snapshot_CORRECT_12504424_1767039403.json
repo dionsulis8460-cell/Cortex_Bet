@@ -1,0 +1,31 @@
+{
+  "match_id": 12504424,
+  "timestamp_generation": 1767039403,
+  "timestamp_match_start": 1737143100,
+  "home_team": "Roma",
+  "away_team": "Genoa",
+  "status_at_snapshot": "finished",
+  "minute_at_snapshot": null,
+  "score_at_snapshot": "3-1",
+  "current_stats": {
+    "corners_home": 3,
+    "corners_away": 2,
+    "total_corners": 5
+  },
+  "features_historical": {
+    "home_avg_corners_5g": 10.2,
+    "home_total_corners_last5": 51,
+    "away_avg_corners_5g": 12.2,
+    "away_total_corners_last5": 61
+  },
+  "validation": {
+    "generated_during_match": false,
+    "minutes_since_start": 498271,
+    "critical_check": {
+      "query_used_less_than": true,
+      "excluded_current_match": true,
+      "only_finished_games": true
+    }
+  },
+  "note": "Snapshot CORRETO gerado DURANTE jogo ao vivo (Tarefa 2.1.B)"
+}

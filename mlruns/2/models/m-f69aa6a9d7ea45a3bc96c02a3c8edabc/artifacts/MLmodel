@@ -1,0 +1,22 @@
+artifact_path: file:///C:/Users/OEM/Desktop/Cortex_Bet/Cortex_Bet/mlruns/2/models/m-f69aa6a9d7ea45a3bc96c02a3c8edabc/artifacts
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.pkl
+    predict_fn: predict
+    python_version: 3.12.1
+  sklearn:
+    code: null
+    pickled_model: model.pkl
+    serialization_format: cloudpickle
+    sklearn_version: 1.8.0
+mlflow_version: 3.8.1
+model_id: m-f69aa6a9d7ea45a3bc96c02a3c8edabc
+model_size_bytes: 4385467
+model_uuid: m-f69aa6a9d7ea45a3bc96c02a3c8edabc
+prompts: null
+run_id: ef9dc5b6ba1642b2a614cf2c57a564dc
+utc_time_created: '2026-01-18 09:40:13.621044'

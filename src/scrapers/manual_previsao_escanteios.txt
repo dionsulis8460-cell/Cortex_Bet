@@ -1,0 +1,253 @@
+
+MANUAL COMPLETO — SISTEMA PROFISSIONAL DE PREVISÃO DE ESCANTEIOS (PRE-LIVE)
+
+Este documento descreve, passo a passo, a construção de um sistema profissional de previsão
+de escanteios para apostas esportivas com dinheiro real. O foco é modelagem probabilística,
+calibração e gestão de risco, seguindo estado da arte acadêmico e práticas de mercado.
+
+==================================================
+PARTE 0 — FILOSOFIA DO PROJETO
+==================================================
+
+1. Não prever over/under diretamente.
+2. Modelar distribuições probabilísticas completas.
+3. Comparar a distribuição do modelo com o mercado.
+4. Apostar apenas quando houver valor esperado positivo.
+5. Priorizar sobrevivência e controle de risco.
+
+==================================================
+PARTE 1 — ESTRUTURA DO PROJETO
+==================================================
+
+corners-betting/
+│
+├── data/
+│   ├── raw/
+│   ├── cleaned/
+│   ├── features/
+│   └── odds/
+│
+├── scraping/
+│   ├── sofascore.py
+│   ├── odds.py
+│   └── scheduler.py
+│
+├── preprocessing/
+│   ├── cleaning.py
+│   ├── rolling.py
+│   ├── normalization.py
+│   └── feature_store.py
+│
+├── models/
+│   ├── poisson_bayes.py
+│   ├── hawkes.py
+│   ├── neural_residual.py
+│   └── ensemble.py
+│
+├── evaluation/
+│   ├── backtest.py
+│   ├── calibration.py
+│   └── metrics.py
+│
+├── betting/
+│   ├── probability.py
+│   ├── expected_value.py
+│   ├── staking.py
+│   └── risk.py
+│
+├── api/
+│   └── app.py
+│
+├── dashboard/
+│   └── react/
+│
+└── config.yaml
+
+==================================================
+PARTE 2 — COLETA DE DADOS
+==================================================
+
+Coletar para cada jogo:
+- Data, liga, mandante, visitante
+- Escanteios FT / HT / 2T
+- Cruzamentos
+- Ataques perigosos
+- Posse de bola
+- Chutes bloqueados
+- Momentum (AUC)
+- Flag Home/Away
+
+Regra crítica:
+NENHUMA informação do jogo atual pode entrar no modelo pre-live.
+
+==================================================
+PARTE 3 — LIMPEZA E PREPARAÇÃO
+==================================================
+
+- Remover jogos cancelados ou incompletos
+- Padronizar IDs e timestamps
+- Criar dataset por time (uma linha por time por jogo)
+- Separar mandante e visitante
+
+==================================================
+PARTE 4 — FEATURE ENGINEERING (PRE-LIVE)
+==================================================
+
+Usar janelas temporais com EWMA:
+
+- Forma: últimos 5 jogos
+- Estilo: últimos 10–20 jogos
+- Momentum: últimos 8 jogos
+
+Principais features:
+
+Cross Pressure Index (CPI):
+CPI = Crosses / (Possession * 90)
+
+Corner Rate (CR):
+CR = Corners / 90
+
+Corner Conversion Rate (CCR):
+CCR = Corners / DangerousAttacks
+
+Momentum Histórico:
+MOM = média da AUC de momentum (últimos 8 jogos)
+
+Style Clash Index (SCI):
+SCI = CPI_home * (1 - WideDef_away)
+
+League Pace:
+LP = média de escanteios da liga
+
+Todas as features devem ser:
+- Normalizadas por posse
+- Ajustadas pela força do adversário
+- Ajustadas pela média da liga
+
+==================================================
+PARTE 5 — MODELO ESTATÍSTICO PRINCIPAL
+==================================================
+
+Modelo: Poisson Bayesiano Hierárquico
+
+Corners ~ Poisson(lambda)
+
+log(lambda) = X * beta + efeito_time + efeito_liga + vantagem_casa
+
+Efeitos:
+- Time ~ Normal(0, sigma_time)
+- Liga ~ Normal(0, sigma_liga)
+
+Implementação recomendada:
+- PyMC ou Stan
+
+==================================================
+PARTE 6 — PROCESSO TEMPORAL (HAWKES)
+==================================================
+
+Objetivo:
+Modelar dependência temporal e clusters de escanteios.
+
+Usado para:
+- Ajustar intensidade do jogo
+- Estimar proporção HT / 2T
+- Melhorar mercados asiáticos
+
+==================================================
+PARTE 7 — REDE NEURAL (USO CORRETO)
+==================================================
+
+A rede neural NÃO prevê escanteios diretamente.
+
+Função:
+Corrigir viés residual do modelo estatístico.
+
+Formula:
+lambda_final = lambda_stat * (1 + delta_nn)
+
+Onde:
+delta_nn ∈ [-0.15, +0.15]
+
+Inputs da NN:
+- Momentum
+- Style Clash
+- Forma recente
+- Diferença de estilos
+
+Arquitetura:
+- LSTM curta ou Temporal CNN
+- Regularização forte
+- Early stopping
+
+==================================================
+PARTE 8 — DERIVAÇÃO DE MERCADOS
+==================================================
+
+A partir da distribuição:
+- Over/Under
+- Asian lines
+- HT / 2T
+- Team Corners
+
+Nenhum novo modelo é treinado nesta etapa.
+
+==================================================
+PARTE 9 — AVALIAÇÃO
+==================================================
+
+Métricas obrigatórias:
+- Log-loss
+- Brier Score
+- Calibration Curve
+- ROI
+- Closing Line Value (CLV)
+- Máximo Drawdown
+
+Split de dados:
+- Temporal (rolling window)
+- Nunca aleatório
+
+==================================================
+PARTE 10 — DECISÃO DE APOSTA
+==================================================
+
+Expected Value:
+EV = Prob_modelo * Odds - 1
+
+Stake:
+Kelly fracionado (ex: 25% do Kelly)
+
+==================================================
+PARTE 11 — API E DASHBOARD
+==================================================
+
+API:
+- FastAPI
+- Endpoints de jogos, probabilidades e histórico
+
+Dashboard (React):
+- Jogos do dia
+- Edge (%)
+- Distribuição de escanteios
+- ROI histórico
+- Drawdown
+
+==================================================
+PARTE 12 — REGRAS DE SOBREVIVÊNCIA
+==================================================
+
+- Nunca apostar sem edge
+- Nunca aumentar stake após sequência negativa
+- Nunca mudar modelo durante drawdown
+- Calibração é mais importante que acurácia
+
+==================================================
+CONCLUSÃO
+==================================================
+
+A abordagem vencedora é:
+Modelagem estatística probabilística + Processo temporal + Rede neural residual + Gestão de risco.
+
+Rede neural sozinha: NÃO
+ML clássico sozinho: NÃO
+Modelo híbrido estruturado: SIM

@@ -1,0 +1,6 @@
+RELATÓRIO DE CALIBRAÇÃO (ECE)
+=============================
+Over 9.5: ECE = 0.2512
+Over 10.5: ECE = 0.3067
+Over 11.5: ECE = 0.3611
+Over 12.5: ECE = 0.4009
