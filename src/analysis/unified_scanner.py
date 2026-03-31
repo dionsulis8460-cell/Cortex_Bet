@@ -16,7 +16,7 @@ from src.scrapers.sofascore import SofaScoreScraper
 from src.database.db_manager import DBManager
 # [NEW] Manager AI Integration
 from src.analysis.manager_ai import ManagerAI, PredictionResult
-from src.domain.strategies.selection_strategy import SelectionStrategy
+from src.domain.strategies.scientific_scorer import ScientificSelectionStrategy
 
 # Top 8 Ligas Monitoradas (IDs SofaScore)
 TOP_LEAGUES = [325, 17, 8, 31, 35, 34, 23, 83, 390]  # BR, PL, LAL, BUN, SER, LIG, CL, POR, ChL
@@ -269,68 +269,129 @@ def scan_opportunities_core(
         # 2. Processa jogos usando a nova função extraída
         results = process_scanned_matches(matches, db, manager, progress_callback, verbose)
         
-        # --- PHASE 2: MANAGER AI (TOP 7 SELECTION) ---
+        # --- PHASE 2: MANAGER AI (TOP 7 SELECTION — SCIENTIFIC) ---
         try:
              if results:
-                 if verbose: print(f"\n🧠 Manager AI: Selecionando Top 7 de {len(results)} jogos...")
+                 if verbose: print(f"\n🧠 Manager AI: Selecionando Top 7 de {len(results)} jogos (Score Científico)...")
                  
-                 strategy = SelectionStrategy(min_confidence=0.60)
-                 import pandas as pd # Needed for dummy features
+                 strategy = ScientificSelectionStrategy(min_confidence=0.55)
                  
                  # 1. Adapt results to Strategy Format
                  candidates = []
+                 market_data_map = {}
+                 
                  for r in results:
                      try:
-                         # Ensure we have all needed keys
                          if 'prediction' in r and 'confidence' in r and 'line_val' in r:
                             is_over = 'Over' in r['bet'] or 'Mais' in r['bet']
                             
-                            # Reconstruct strongly-typed object (Manager already returned this structure but we converted to dict)
-                            # Actually, for Top 7 strategy we can use the dict fields directly if Strategy supports it
-                            # But Strategy expects candidates with 'result': PredictionResult
-                            
                             res = PredictionResult(
                                 match_id=int(r['match_id']),
-                                home_team="", # Lazy
+                                home_team="",
                                 away_team="",
                                 final_prediction=float(r['raw_score']),
                                 best_bet=r['bet'],
                                 line_val=float(r['line_val']),
                                 consensus_confidence=float(r['confidence']),
                                 is_over=is_over,
-                                ensemble_confidence=0, neural_confidence=0, ensemble_raw=0, neural_raw=0, fair_odds=0, ev_percentage=0 # Dummy
+                                ensemble_confidence=0, neural_confidence=0, ensemble_raw=0, neural_raw=0, fair_odds=0, ev_percentage=0
                             )
                             candidates.append({
                                 'match_id': r['match_id'], 
-                                'match_name': r['match'], 
+                                'match_name': r['match'],
+                                'league': r.get('league', ''),
                                 'result': res
                             })
+                            
+                            # Build market distribution data from champion prediction
+                            predicted_val = float(r['raw_score'])
+                            std_estimate = max(predicted_val * 0.25, 1.0)
+                            prob = float(r['confidence'])
+                            
+                            market_data_map[int(r['match_id'])] = {
+                                'league': r.get('league', ''),
+                                'stability': 0.7,
+                                'distributions': {
+                                    'ft_total': {
+                                        'expected': predicted_val,
+                                        'std': std_estimate,
+                                        'prob_over': prob if is_over else 1 - prob,
+                                        'prob_under': 1 - prob if is_over else prob,
+                                        'ci_90': [max(0, predicted_val - 1.64 * std_estimate),
+                                                  predicted_val + 1.64 * std_estimate],
+                                        'line': float(r['line_val']),
+                                        'ece': 0.10,
+                                    }
+                                }
+                            }
                      except Exception as e:
                          pass
 
-                 # 2. Execute Strategy
-                 ranked_picks = strategy.evaluate_candidates(candidates)
+                 # 2. Execute Scientific Strategy
+                 ranked_picks = strategy.evaluate_candidates(candidates, market_data=market_data_map)
                  top_7 = strategy.select_top_n(ranked_picks, 7)
                  
                  if verbose:
-                     print(f"   🏆 Top 7 Selecionados ({len(top_7)}):")
+                     print(f"   🏆 Top 7 Selecionados ({len(top_7)}) — Score Científico:")
                  
-                 # 3. Save to DB (Global Top 7)
+                 # 3. Save to DB (Top 7 with scientific metadata)
                  for i, pick in enumerate(top_7, 1):
                      if verbose:
-                         print(f"      {i}. {pick.match_name}: {pick.selection} ({pick.probability:.1%})")
+                         print(f"      {i}. {pick.match_name}: {pick.selection} "
+                               f"(P={pick.probability:.1%} | Score={pick.rank_score:.3f} | "
+                               f"σ={pick.uncertainty:.1f} | E[X]={pick.expected_corners:.1f})")
                          
+                     # Build scientific feedback text for DB
+                     sci_feedback = (
+                         f"Scientific Score: {pick.rank_score:.3f} | "
+                         f"P_cal: {pick.probability:.1%} | "
+                         f"E[X]: {pick.expected_corners:.1f} | "
+                         f"σ: {pick.uncertainty:.1f} | "
+                         f"CI90: [{pick.ci_90_low:.1f}, {pick.ci_90_high:.1f}] | "
+                         f"Stability: {pick.stability_score:.2f} | "
+                         f"Family: {pick.market_family}"
+                     )
+                     
+                     import json
+                     
                      db.save_prediction(
                          match_id=int(pick.match_id),
-                         model_version='CORTEX_MANAGER_V3',
+                         model_version='CORTEX_SCIENTIFIC_V1',
                          value=pick.line,
                          label=pick.selection,
                          confidence=pick.probability,
-                         odds=1.90, # Placeholder until scraping is piped through
-                         category='Top7', # Critical for UI
+                         odds=pick.fair_odd,
+                         category='Top7',
                          market_group='Corners',
-                         feedback_text=f"Autoselected by Manager AI (Rank #{i})",
+                         feedback_text=sci_feedback,
                          fair_odds=pick.fair_odd,
+                         verbose=False
+                     )
+                     
+                     # Save scientific metadata as separate prediction for UI enrichment
+                     sci_meta = {
+                         'rank': i,
+                         'scientific_score': pick.rank_score,
+                         'uncertainty': pick.uncertainty,
+                         'expected_corners': pick.expected_corners,
+                         'ci_90': [pick.ci_90_low, pick.ci_90_high],
+                         'stability': pick.stability_score,
+                         'ece_local': pick.ece_local,
+                         'market_family': pick.market_family,
+                         'market_distributions': pick.market_distributions,
+                     }
+                     
+                     db.save_prediction(
+                         match_id=int(pick.match_id),
+                         model_version='CORTEX_SCIENTIFIC_META',
+                         value=pick.rank_score,
+                         label=f"SCI_RANK_{i}",
+                         confidence=pick.rank_score,
+                         odds=0.0,
+                         category='ScientificMeta',
+                         market_group='ScientificData',
+                         feedback_text=json.dumps(sci_meta, default=str),
+                         fair_odds=0.0,
                          verbose=False
                      )
                      

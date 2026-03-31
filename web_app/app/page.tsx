@@ -144,8 +144,8 @@ export default function Dashboard() {
               <div className="hidden xl:flex items-center gap-4">
                 <div className="w-px h-8 bg-slate-700" />
                 <div className="flex flex-col items-end">
-                  <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wide">Top 7 Health</span>
-                  <span className="text-emerald-400 font-bold text-sm">82.0% Win Rate</span>
+                  <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wide">Top 7 Scientific</span>
+                  <span className="text-emerald-400 font-bold text-sm">Score-Based Ranking</span>
                 </div>
               </div>
             </div>

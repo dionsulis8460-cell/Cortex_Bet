@@ -45,7 +45,7 @@ export default function MatchFilters({ filters, onFilterChange, totalMatches }: 
               <span className="text-slate-400 text-sm">matches</span>
             </div>
             {filters.showTop7Only && (
-              <p className="text-xs text-orange-400 font-medium mt-0.5">Top 7 mode active</p>
+              <p className="text-xs text-orange-400 font-medium mt-0.5">Top 7 Scientific Picks</p>
             )}
           </div>
         </div>
@@ -187,7 +187,7 @@ export default function MatchFilters({ filters, onFilterChange, totalMatches }: 
               }`}
           >
             <Zap size={18} className={filters.showTop7Only ? 'animate-pulse' : ''} />
-            {filters.showTop7Only ? 'Top 7 Active' : 'Show Top 7 Only'}
+            {filters.showTop7Only ? 'Top 7 Scientific' : 'Show Top 7 Picks'}
           </button>
 
           {/* Sort By */}

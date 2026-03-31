@@ -160,3 +160,14 @@ class BettingPick:
     fair_odd: float
     raw_score: float
     rank_score: float  # Para ordenação
+
+    # --- Scientific fields (Phase 2) ---
+    league: str = ""
+    market_family: str = "ft_total"
+    uncertainty: float = 0.0       # std da distribuição MC
+    ece_local: float = 0.0         # ECE estimado da família (do calibrador)
+    stability_score: float = 0.0   # 1 - cv (coeficiente de variação normalizado)
+    ci_90_low: float = 0.0         # Intervalo de credibilidade 90% — limite inferior
+    ci_90_high: float = 0.0        # Intervalo de credibilidade 90% — limite superior
+    expected_corners: float = 0.0  # E[X] do mercado
+    market_distributions: Dict[str, Any] = field(default_factory=dict)  # 9 mercados derivados

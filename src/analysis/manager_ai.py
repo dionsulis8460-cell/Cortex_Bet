@@ -4,6 +4,14 @@ ManagerAI - Orquestrador Central de Previsões.
 Regra de Negócio:
     Unifica ProfessionalPredictor (Ensemble), NeuralChallenger (MLP)
     e StatisticalAnalyzer em um pipeline de previsão único.
+
+CHAMPION_ONLY_MODE (refactor/multimercado-cientifico):
+    Quando CHAMPION_ONLY_MODE=True (default), o output final usa EXCLUSIVAMENTE
+    o champion. O challenger continua sendo executado e logado em shadow mode,
+    mas NÃO contribui para o output de produção.
+
+    Variável de ambiente: CHAMPION_ONLY_MODE=0 desativa (modo legado).
+    Ver: docs/audit/04_plano_migracao.md — Fase 1.
 """
 
 from typing import Dict, Any, List, Optional, Tuple
@@ -12,6 +20,14 @@ import numpy as np
 import os
 import joblib
 from pathlib import Path
+
+# ---------------------------------------------------------------------------
+# Feature flag — Fase 1 do plano de migração multimercado
+# CHAMPION_ONLY_MODE=True => output = champion_conf (sem blend com challenger)
+# CHAMPION_ONLY_MODE=False => comportamento legado (blend 0.5/0.5)
+# ---------------------------------------------------------------------------
+_env_flag = os.environ.get("CHAMPION_ONLY_MODE", "1").strip().lower()
+CHAMPION_ONLY_MODE: bool = _env_flag not in ("0", "false", "no")
 
 # Domain Models (Single Source of Truth)
 from src.domain.models import PredictionResult
@@ -192,13 +208,23 @@ class ManagerAI:
             challenger_conf = poisson.cdf(int(line_val), challenger_raw)
             
         # 6. Consensus & Final Decision
-        agreement = 1.0
-        if (is_over and challenger_raw > line_val) or \
-           (not is_over and challenger_raw < line_val):
-            agreement = 1.1
-
-        final_conf = (champion_conf * 0.5 + prob_score * 0.5) * agreement
-        final_conf = min(0.95, final_conf)
+        # -----------------------------------------------------------------------
+        # CHAMPION_ONLY_MODE (Fase 1 — refactor/multimercado-cientifico):
+        #   True  => output = champion_conf (sem blend — 1 champion oficial)
+        #   False => comportamento legado (blend champion 0.5 + prob_score 0.5)
+        # O challenger continua calculado para shadow logging independente do modo.
+        # -----------------------------------------------------------------------
+        if CHAMPION_ONLY_MODE:
+            final_conf = min(0.95, champion_conf)
+            agreement = 1.0  # não altera output; mantido para log
+        else:
+            # Legado: blend com fator de concordância
+            agreement = 1.0
+            if (is_over and challenger_raw > line_val) or \
+               (not is_over and challenger_raw < line_val):
+                agreement = 1.1
+            final_conf = (champion_conf * 0.5 + prob_score * 0.5) * agreement
+            final_conf = min(0.95, final_conf)
         
         # P2-A FIX: Cálculo de Odd Justa (Fair Odds)
         # O usuário prefere prever o valor real da odd (Odd Justa) em vez de fixar 
@@ -277,6 +303,18 @@ class ManagerAI:
         print(f"[DEBUG PREDICT] Challenger Out:  {challenger_raw:.4f}")
         print(f"[DEBUG PREDICT] Line Selected:   {line_val} ({pick})")
         print(f"[DEBUG PREDICT] Confidence:      {final_conf:.1%}")
+        print(f"[DEBUG PREDICT] CHAMPION_ONLY_MODE: {CHAMPION_ONLY_MODE}")
+
+        # Shadow log do challenger (sempre registrado, nunca entra no output)
+        self._log_shadow_challenger(
+            match_id=match_id,
+            champion_raw=champion_raw,
+            challenger_raw=challenger_raw,
+            champion_conf=champion_conf,
+            challenger_conf=challenger_conf,
+            line_val=line_val,
+            is_over=is_over,
+        )
         
         return PredictionResult(
             match_id=match_id,
@@ -400,3 +438,44 @@ class ManagerAI:
         from scipy.stats import poisson
         # P(X > k)
         return 1 - poisson.cdf(k, mu)
+
+    def _log_shadow_challenger(
+        self,
+        match_id: int,
+        champion_raw: float,
+        challenger_raw: float,
+        champion_conf: float,
+        challenger_conf: float,
+        line_val: float,
+        is_over: bool,
+    ) -> None:
+        """
+        Registra a predição do challenger em shadow mode.
+
+        O challenger nunca entra no output de produção (veja CHAMPION_ONLY_MODE).
+        Este log é usado para walk-forward comparativo offline.
+        Falha silenciosa — nunca deve bloquear o output do champion.
+        """
+        try:
+            import json
+            from datetime import datetime, timezone
+
+            shadow_dir = Path("data/shadow_logs")
+            shadow_dir.mkdir(parents=True, exist_ok=True)
+            log_path = shadow_dir / "challenger_shadow.jsonl"
+
+            record = {
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "match_id": match_id,
+                "champion_raw": round(champion_raw, 4),
+                "challenger_raw": round(challenger_raw, 4),
+                "champion_conf": round(champion_conf, 4),
+                "challenger_conf": round(challenger_conf, 4),
+                "line_val": line_val,
+                "is_over": is_over,
+                "champion_only_mode": CHAMPION_ONLY_MODE,
+            }
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record) + "\n")
+        except Exception as e:
+            print(f"[SHADOW LOG] Warning: could not write shadow log: {e}")

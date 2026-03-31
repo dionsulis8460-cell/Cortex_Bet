@@ -103,7 +103,8 @@ class DashboardDataProvider:
                 p.fair_odds,
                 m.home_team_id,
                 m.away_team_id,
-                p.category
+                p.category,
+                p.feedback_text
             FROM predictions p
             JOIN matches m ON p.match_id = m.match_id
             LEFT JOIN match_stats s ON m.match_id = s.match_id
@@ -201,8 +202,9 @@ class DashboardDataProvider:
             # Add prediction
             confidence = row[4] if row[4] is not None else 0.0
             fair_odd = float(row[30]) if len(row) > 30 and row[30] is not None else 0.0
-            # row[33] = p.category (added in Fix B2)
+            # row[33] = p.category, row[34] = p.feedback_text
             pred_category = row[33] if len(row) > 33 and row[33] is not None else 'Alternative'
+            feedback_text = row[34] if len(row) > 34 and row[34] is not None else ''
             
             # Fallback calculation if DB fair_odd is 0 (legacy data)
             if fair_odd == 0 and confidence > 0:
@@ -220,7 +222,8 @@ class DashboardDataProvider:
                 'marketGroup': row[5],
                 'isCorrect': bool(row[6]) if row[6] is not None else None,
                 'status': row[7],
-                'category': pred_category  # Fix B2: expose category to frontend
+                'category': pred_category,
+                'feedback_text': feedback_text
             })
         
         # Convert to list and select main bet for each match
@@ -302,21 +305,93 @@ class DashboardDataProvider:
             
             match_data['generalPrediction'] = round(total_corners_pred, 1)
         
+        # --- SCIENTIFIC METADATA ENRICHMENT ---
+        # Parse ScientificMeta predictions and attach to matches
+        for match_data in matches:
+            sci_meta = None
+            sci_preds = [p for p in match_data['predictions'] 
+                         if p.get('category') == 'ScientificMeta']
+            
+            if sci_preds:
+                try:
+                    import json
+                    raw_text = sci_preds[0].get('type', '')
+                    # feedback_text stores the JSON metadata
+                    # But we need to find it from the DB — it's in the prediction record
+                    # The feedback_text was stored as JSON in save_prediction
+                    # We need to look for it in the raw query data
+                    pass
+                except:
+                    pass
+            
+            # Parse scientific data from feedback_text of Top7 predictions
+            scientific_data = {}
+            top7_preds = [p for p in match_data['predictions']
+                          if p.get('category') == 'Top7']
+            
+            if top7_preds:
+                fb = top7_preds[0].get('feedback_text', '')
+                if 'Scientific Score' in str(fb):
+                    try:
+                        parts = str(fb).split(' | ')
+                        for part in parts:
+                            if 'Scientific Score:' in part:
+                                scientific_data['scientificScore'] = float(part.split(':')[1].strip())
+                            elif 'E[X]:' in part:
+                                scientific_data['expectedCorners'] = float(part.split(':')[1].strip())
+                            elif 'σ:' in part:
+                                scientific_data['uncertainty'] = float(part.split(':')[1].strip())
+                            elif 'CI90:' in part:
+                                ci_str = part.split(':')[1].strip()
+                                ci_str = ci_str.replace('[', '').replace(']', '')
+                                vals = ci_str.split(',')
+                                scientific_data['ci90'] = [float(vals[0].strip()), float(vals[1].strip())]
+                            elif 'Stability:' in part:
+                                scientific_data['stability'] = float(part.split(':')[1].strip())
+                            elif 'Family:' in part:
+                                scientific_data['marketFamily'] = part.split(':')[1].strip()
+                            elif 'P_cal:' in part:
+                                pval = part.split(':')[1].strip().replace('%', '')
+                                scientific_data['calibratedProb'] = float(pval) / 100.0
+                    except:
+                        pass
+            
+            match_data['scientificData'] = scientific_data if scientific_data else None
+            
+            # Remove ScientificMeta entries from visible predictions
+            match_data['predictions'] = [
+                p for p in match_data['predictions']
+                if p.get('category') != 'ScientificMeta'
+            ]
+
         # Filter Top 7 if requested
         if top7_only:
-            # Get all predictions across all matches, sort, take top 7
-            all_predictions = []
-            for match in matches:
-                for pred in match['predictions']:
-                    all_predictions.append({
-                        'match': match,
-                        'prediction': pred,
-                        'confidence': pred['confidence']
-                    })
+            # Scientific: prefer Top7 category matches, ranked by scientific score
+            top7_match_ids = set()
+            scored_matches = []
             
-            all_predictions.sort(key=lambda x: x['confidence'], reverse=True)
-            top7_matches = list({p['match']['id']: p['match'] for p in all_predictions[:7]}.values())
-            matches = top7_matches
+            for match in matches:
+                has_top7 = any(p.get('category') == 'Top7' for p in match['predictions'])
+                sci_score = 0.0
+                if match.get('scientificData') and match['scientificData'].get('scientificScore'):
+                    sci_score = match['scientificData']['scientificScore']
+                elif has_top7:
+                    # Fallback: use confidence of highest Top7 pick
+                    top7_conf = max((p['confidence'] for p in match['predictions'] 
+                                     if p.get('category') == 'Top7'), default=0)
+                    sci_score = top7_conf
+                
+                if has_top7:
+                    scored_matches.append((sci_score, match))
+            
+            # Sort by scientific score descending
+            scored_matches.sort(key=lambda x: x[0], reverse=True)
+            matches = [m for _, m in scored_matches[:7]]
+            
+            # If less than 7 Top7 matches, fill with highest confidence from remaining
+            if len(matches) < 7:
+                remaining = [m for m in matches if m not in matches]
+                # Actually just keep what we have — 7 is max, not guarantee
         
         return matches
     
