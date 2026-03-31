@@ -772,3 +772,62 @@ def generate_professional_feedback(ml_prediction, confidence, features_df, home_
             lines.append("• ⚡ Baixa convicção - cautela recomendada")
     
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Joint Targets -- refactor/multimercado-cientifico (Fase 2)
+# ---------------------------------------------------------------------------
+
+def create_joint_targets(df):
+    """
+    Gera os 4 targets do vetor latente [home_1H, away_1H, home_2H, away_2H].
+
+    Complementar a create_advanced_features() -- usado pelo JointTrainer.
+    Nao modifica os targets existentes (backward compatibility).
+
+    Requisitos:
+        - corners_home_ft, corners_away_ft  (sempre presentes)
+        - corners_home_ht, corners_away_ht  (HT -- podem estar ausentes)
+
+    Nota sobre 2H:
+        2H de treino = corners_ft - corners_ht sobre dados REAIS observados.
+        Derivar previsoes de 2H subtraindo previsoes (FT_pred - 1H_pred)
+        continua PROIBIDO -- esta funcao gera targets, nao predicoes.
+
+    Returns:
+        pd.DataFrame com colunas [home_1H, away_1H, home_2H, away_2H]
+        preservando o indice de df, ou None se dados insuficientes.
+    """
+    required_ft = ["corners_home_ft", "corners_away_ft"]
+    required_ht = ["corners_home_ht", "corners_away_ht"]
+
+    for col in required_ft:
+        if col not in df.columns:
+            return None
+
+    has_ht = all(c in df.columns for c in required_ht)
+    if not has_ht:
+        return None
+
+    mask = (
+        df["corners_home_ht"].notna()
+        & df["corners_away_ht"].notna()
+        & df["corners_home_ft"].notna()
+        & df["corners_away_ft"].notna()
+        & (df["corners_home_ht"] >= 0)
+        & (df["corners_away_ht"] >= 0)
+        & (df["corners_home_ft"] >= df["corners_home_ht"])
+        & (df["corners_away_ft"] >= df["corners_away_ht"])
+    )
+
+    if mask.sum() < 50:
+        return None
+
+    import pandas as pd
+    sub = df.loc[mask].copy()
+    result = pd.DataFrame(index=sub.index)
+    result["home_1H"] = sub["corners_home_ht"].astype(float)
+    result["away_1H"] = sub["corners_away_ht"].astype(float)
+    result["home_2H"] = (sub["corners_home_ft"] - sub["corners_home_ht"]).clip(lower=0).astype(float)
+    result["away_2H"] = (sub["corners_away_ft"] - sub["corners_away_ht"]).clip(lower=0).astype(float)
+    return result
