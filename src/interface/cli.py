@@ -25,6 +25,12 @@ from src.data.updater import (
     update_all_leagues
 )
 
+# Joint Trainer (multimercado científico)
+def _get_joint_trainer():
+    """Lazy import para evitar carregar dependências pesadas no startup."""
+    from src.training.joint_trainer import JointTrainer
+    return JointTrainer
+
 # Global args mock if needed, but we pass args to functions
 args = None
 
@@ -234,6 +240,83 @@ def scan_opportunities() -> None:
     finally:
         db.close()
 
+def train_joint_model() -> None:
+    """Treino do modelo multimercado científico (JointCornersModel)."""
+    print("\n" + "=" * 60)
+    print("🧬 TREINO MULTIMERCADO CIENTÍFICO (Joint Model)")
+    print("=" * 60)
+    print("Este modo treina o modelo de 4 targets [h1H, a1H, h2H, a2H]")
+    print("com walk-forward temporal e calibração por família.\n")
+
+    print("Opções:")
+    print("  1. Treino padrão (5 folds, seed=42)")
+    print("  2. Treino customizado")
+    print("  0. Voltar")
+
+    choice = input("Escolha: ").strip()
+    if choice == '0':
+        return
+
+    n_splits = 5
+    random_state = 42
+    n_simulations = 10_000
+
+    if choice == '2':
+        try:
+            n_splits = int(input("Número de folds (default=5): ").strip() or "5")
+            random_state = int(input("Seed (default=42): ").strip() or "42")
+            n_simulations = int(input("Simulações MC (default=10000): ").strip() or "10000")
+        except ValueError:
+            print("Valor inválido. Usando defaults.")
+
+    print(f"\nConfigurações: folds={n_splits}, seed={random_state}, MC={n_simulations}")
+    confirm = input("Confirmar treino? (s/n): ").strip().lower()
+    if confirm != 's':
+        print("Treino cancelado.")
+        return
+
+    db = DBManager()
+    try:
+        from src.features.feature_store import FeatureStore
+
+        df_history = db.get_historical_data()
+        if df_history.empty or len(df_history) < 200:
+            print("⚠️ Histórico insuficiente. Necessário ≥ 200 jogos com dados HT.")
+            return
+
+        feature_store = FeatureStore(db)
+        JointTrainer = _get_joint_trainer()
+        trainer = JointTrainer(
+            n_splits=n_splits,
+            n_simulations=n_simulations,
+            random_state=random_state,
+        )
+        report = trainer.run(df_history, feature_store)
+
+        print("\n" + "=" * 60)
+        print("✅ TREINO CONCLUÍDO")
+        print("=" * 60)
+        if 'oof_metrics' in report:
+            print("\nMétricas OOF (Walk-Forward):")
+            for k, v in report['oof_metrics'].items():
+                val = v if isinstance(v, (int, float)) else 'N/A'
+                print(f"  {k}: MAE = {val:.3f}" if isinstance(val, float) else f"  {k}: {val}")
+        if 'calibration_report' in report:
+            print("\nCalibração por família:")
+            cal = report['calibration_report']
+            if isinstance(cal, dict):
+                for fam, data in cal.items():
+                    n = data.get('n_samples', 0) if isinstance(data, dict) else '?'
+                    print(f"  {fam}: {n} amostras")
+        print(f"\nArtefatos salvos em models/ e data/evaluation/")
+
+    except Exception as e:
+        print(f"❌ Erro no treino joint: {e}")
+        traceback.print_exc()
+    finally:
+        db.close()
+
+
 def manage_users_cli():
     """Menu de usuários."""
     db = DBManager()
@@ -311,6 +394,7 @@ def run_cli():
         print("5. Atualizar Liga Específica (3 Anos)")
         print("6. Atualizar Jogo Específico (URL)")
         print(f"{Colors.CYAN}7. 📡 Scanner de Oportunidades (Dia){Colors.RESET}")
+        print(f"{Colors.GREEN}8. 🧬 Treinar Modelo Multimercado (Joint){Colors.RESET}")
         print("9. 🚀 Atualizar TODAS as Ligas (3 Anos - Batch)")
         print("10. 🧹 Limpar Histórico (Remover GREEN/RED)")
         print(f"{Colors.YELLOW}11. 👤 Gerenciar Usuários{Colors.RESET}")
@@ -326,6 +410,7 @@ def run_cli():
         elif choice == '5': update_specific_league()
         elif choice == '6': update_match_by_url()
         elif choice == '7': scan_opportunities()
+        elif choice == '8': train_joint_model()
         elif choice == '9': update_all_leagues()
         elif choice == '10':
             db = DBManager()

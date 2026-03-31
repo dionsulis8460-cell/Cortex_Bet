@@ -77,6 +77,15 @@ interface MatchPrediction {
     status?: string; // NEW
   }>;
   generalPrediction?: number;
+  scientificData?: {
+    scientificScore: number;
+    expectedCorners: number;
+    uncertainty: number;
+    ci90: [number, number];
+    stability: number;
+    marketFamily: string;
+    calibratedProb: number;
+  } | null;
 }
 
 export default function MatchCardV2({
@@ -88,6 +97,24 @@ export default function MatchCardV2({
 }) {
   const [expanded, setExpanded] = useState(false);
   const { addBet } = useBettingSlip();
+
+  const scoreColor = (score: number) => {
+    if (score >= 0.7) return 'text-emerald-400';
+    if (score >= 0.5) return 'text-amber-400';
+    return 'text-red-400';
+  };
+
+  const uncertaintyColor = (u: number) => {
+    if (u <= 2) return 'text-emerald-400';
+    if (u <= 3) return 'text-amber-400';
+    return 'text-red-400';
+  };
+
+  const stabilityBarColor = (s: number) => {
+    if (s >= 0.7) return 'bg-emerald-500';
+    if (s >= 0.4) return 'bg-amber-500';
+    return 'bg-red-500';
+  };
 
   const getRankIcon = (rank: number) => {
     if (rank === 1) return "🔥";
@@ -234,6 +261,60 @@ export default function MatchCardV2({
                   </>
                 )}
              </div>
+          </div>
+        )}
+
+        {/* Scientific Data Panel */}
+        {match.scientificData && (
+          <div className="mb-4 bg-gradient-to-r from-indigo-900/20 to-purple-900/20 border border-indigo-500/30 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">🔬 Scientific Analysis</span>
+              <span className="text-[10px] bg-indigo-900/40 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/30">
+                V1
+              </span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 text-xs">
+              <div>
+                <p className="text-slate-500 mb-0.5">Score</p>
+                <p className={`font-bold font-mono ${scoreColor(match.scientificData.scientificScore)}`}>
+                  {match.scientificData.scientificScore.toFixed(3)}
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-500 mb-0.5">E[Corners]</p>
+                <p className="text-white font-bold font-mono">{match.scientificData.expectedCorners.toFixed(1)}</p>
+              </div>
+              <div>
+                <p className="text-slate-500 mb-0.5">Uncertainty (σ)</p>
+                <p className={`font-bold font-mono ${uncertaintyColor(match.scientificData.uncertainty)}`}>
+                  ±{match.scientificData.uncertainty.toFixed(1)}
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-500 mb-0.5">CI 90%</p>
+                <p className="text-slate-300 font-mono">
+                  [{match.scientificData.ci90[0].toFixed(1)}, {match.scientificData.ci90[1].toFixed(1)}]
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-500 mb-0.5">P(calibrated)</p>
+                <p className="text-blue-400 font-bold font-mono">
+                  {(match.scientificData.calibratedProb * 100).toFixed(0)}%
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-500 mb-0.5">Stability</p>
+                <div className="flex items-center gap-1">
+                  <div className="h-1.5 w-12 bg-slate-700 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${stabilityBarColor(match.scientificData.stability)}`}
+                      style={{ width: `${match.scientificData.stability * 100}%` }}
+                    />
+                  </div>
+                  <span className="text-slate-400 font-mono">{match.scientificData.stability.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
